@@ -89,14 +89,17 @@ export default function SorteosScreen({ navigation }) {
     }
 
     const renderItem = ({ item }) => {
-        const countDelivered = item.pagos?.filter(p => p.estado === 'delivered').length || 0;
-        const countEfectivo = item.pagos?.filter(p => p.estado === 'paid' && p.metodo_pago === 'efectivo').length || 0;
-        const countBizum = item.pagos?.filter(p => p.estado === 'paid' && p.metodo_pago === 'bizum').length || 0;
+        const pagosArr = item.pagos || [];
+        const precio = parseFloat(item.precio) || 0;
+
+        const countDelivered = pagosArr.filter(p => p.estado === 'delivered').length;
+        const countEfectivo = pagosArr.filter(p => p.estado === 'paid' && (p.metodo_pago === 'efectivo' || !p.metodo_pago)).length;
+        const countBizum = pagosArr.filter(p => p.estado === 'paid' && p.metodo_pago === 'bizum').length;
         const countPaid = countEfectivo + countBizum;
 
-        const totalEfectivo = countEfectivo * item.precio;
-        const totalBizum = countBizum * item.precio;
-        const totalCollected = countPaid * item.precio;
+        const totalEfectivo = (countEfectivo * precio).toFixed(2).replace('.00', '');
+        const totalBizum = (countBizum * precio).toFixed(2).replace('.00', '');
+        const totalCollected = (countPaid * precio).toFixed(2).replace('.00', '');
 
         return (
             <TouchableOpacity
@@ -110,7 +113,7 @@ export default function SorteosScreen({ navigation }) {
 
                 <View style={styles.cardStatsRow}>
                     <View style={styles.cardStat}>
-                        <Text style={styles.cardStatLabel}>Entregados</Text>
+                        <Text style={styles.cardStatLabel}>Entreg.</Text>
                         <Text style={styles.cardStatValue}>{countDelivered}</Text>
                     </View>
                     <View style={styles.cardStat}>

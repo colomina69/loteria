@@ -1,5 +1,6 @@
 .agent/
 .agents/
+skills/
 node_modules/
 .expo/
 .next/

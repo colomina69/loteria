@@ -106,33 +106,35 @@ export default function SorteosScreen({ navigation }) {
                 style={styles.card}
                 onPress={() => navigation.navigate('Pagos', { sorteo: item })}
             >
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>{item.nombre}</Text>
-                    <Text style={styles.cardPrice}>{item.precio} €</Text>
-                </View>
+                <View>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle}>{item.nombre}</Text>
+                        <Text style={styles.cardPrice}>{item.precio} €</Text>
+                    </View>
 
-                <View style={styles.cardStatsRow}>
-                    <View style={styles.cardStat}>
-                        <Text style={styles.cardStatLabel}>Entreg.</Text>
-                        <Text style={styles.cardStatValue}>{countDelivered}</Text>
+                    <View style={styles.cardStatsRow}>
+                        <View style={styles.cardStat}>
+                            <Text style={styles.cardStatLabel}>Entreg.</Text>
+                            <Text style={styles.cardStatValue}>{countDelivered}</Text>
+                        </View>
+                        <View style={styles.cardStat}>
+                            <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Efect. ({countEfectivo})</Text>
+                            <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalEfectivo}€</Text>
+                        </View>
+                        <View style={styles.cardStat}>
+                            <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Bizum ({countBizum})</Text>
+                            <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalBizum}€</Text>
+                        </View>
+                        <View style={styles.cardStat}>
+                            <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Total</Text>
+                            <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalCollected}€</Text>
+                        </View>
                     </View>
-                    <View style={styles.cardStat}>
-                        <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Efect. ({countEfectivo})</Text>
-                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalEfectivo}€</Text>
-                    </View>
-                    <View style={styles.cardStat}>
-                        <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Bizum ({countBizum})</Text>
-                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalBizum}€</Text>
-                    </View>
-                    <View style={styles.cardStat}>
-                        <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Total</Text>
-                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalCollected}€</Text>
-                    </View>
-                </View>
 
-                <View style={styles.dateContainer}>
-                    <LucideCalendar size={14} color={Colors.subtext} style={{ marginRight: 4 }} />
-                    <Text style={styles.cardDate}>{formatDateToUI(item.fecha)}</Text>
+                    <View style={styles.dateContainer}>
+                        <LucideCalendar size={14} color={Colors.subtext} style={{ marginRight: 4 }} />
+                        <Text style={styles.cardDate}>{formatDateToUI(item.fecha)}</Text>
+                    </View>
                 </View>
             </TouchableOpacity>
         );

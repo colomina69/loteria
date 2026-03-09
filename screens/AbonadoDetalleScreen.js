@@ -19,6 +19,7 @@ export default function AbonadoDetalleScreen({ route }) {
                 .from('pagos')
                 .select(`
                     estado,
+                    metodo_pago,
                     fecha_pago,
                     sorteos (
                         nombre,
@@ -66,7 +67,19 @@ export default function AbonadoDetalleScreen({ route }) {
                 <View style={{ flex: 1 }}>
                     <Text style={styles.drawName}>{item.sorteos?.nombre}</Text>
                     <Text style={styles.drawDate}>{formatDateToUI(item.sorteos?.fecha)}</Text>
-                    <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                        <Text style={[styles.statusText, { color: statusColor, marginTop: 0 }]}>{statusLabel}</Text>
+                        {item.estado === 'paid' && (
+                            <>
+                                {item.metodo_pago && (
+                                    <Text style={styles.metodoLabel}> • {item.metodo_pago === 'bizum' ? 'Bizum' : 'Efectivo'}</Text>
+                                )}
+                                {item.fecha_pago && (
+                                    <Text style={styles.metodoLabel}> • {formatDateToUI(item.fecha_pago)}</Text>
+                                )}
+                            </>
+                        )}
+                    </View>
                 </View>
                 {icon}
             </View>
@@ -154,6 +167,11 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginTop: 8,
         textTransform: 'uppercase',
+    },
+    metodoLabel: {
+        fontSize: 12,
+        color: Colors.subtext,
+        fontStyle: 'italic',
     },
     emptyContainer: {
         padding: 40,

@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
-import { LucidePlus, LucideChevronRight } from 'lucide-react-native';
+import { LucidePlus, LucideChevronRight, LucideTrash2, LucideEdit, LucideMoreVertical } from 'lucide-react-native';
+import { Modal } from 'react-native';
 
 const ABC = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Ñ', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
@@ -12,6 +13,10 @@ export default function AbonadosScreen({ navigation }) {
     const [nuevoNombre, setNuevoNombre] = useState('');
     const [añadiendo, setAñadiendo] = useState(false);
     const [filtroLetra, setFiltroLetra] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [abonadoAEditar, setAbonadoAEditar] = useState(null);
+    const [nombreEditado, setNombreEditado] = useState('');
+    const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
     useEffect(() => {
         fetchAbonados();
@@ -56,14 +61,77 @@ export default function AbonadosScreen({ navigation }) {
         }
     }
 
+    async function deleteAbonado(id) {
+        Alert.alert(
+            'Eliminar Abonado',
+            '¿Estás seguro de que quieres eliminar este abonado? Se borrarán también todos sus registros de pagos.',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('abonados')
+                                .delete()
+                                .eq('id', id);
+
+                            if (error) throw error;
+                            fetchAbonados();
+                        } catch (error) {
+                            Alert.alert('Error', error.message);
+                        }
+                    }
+                }
+            ]
+        );
+    }
+
+    async function updateAbonado() {
+        if (!nombreEditado.trim() || !abonadoAEditar) return;
+        setGuardandoEdicion(true);
+        try {
+            const { error } = await supabase
+                .from('abonados')
+                .update({ nombre: nombreEditado.trim() })
+                .eq('id', abonadoAEditar.id);
+
+            if (error) throw error;
+            setModalVisible(false);
+            setAbonadoAEditar(null);
+            fetchAbonados();
+        } catch (error) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setGuardandoEdicion(false);
+        }
+    }
+
+    function abrirEdicion(abonado) {
+        setAbonadoAEditar(abonado);
+        setNombreEditado(abonado.nombre);
+        setModalVisible(true);
+    }
+
     const renderItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.item}
-            onPress={() => navigation.navigate('AbonadoDetalle', { abonado: item })}
-        >
-            <Text style={styles.itemText}>{item.nombre}</Text>
-            <LucideChevronRight size={20} color={Colors.subtext} />
-        </TouchableOpacity>
+        <View style={styles.itemWrapper}>
+            <TouchableOpacity
+                style={styles.itemMain}
+                onPress={() => navigation.navigate('AbonadoDetalle', { abonado: item })}
+            >
+                <Text style={styles.itemText}>{item.nombre}</Text>
+                <LucideChevronRight size={20} color={Colors.subtext} />
+            </TouchableOpacity>
+            <View style={styles.itemActions}>
+                <TouchableOpacity onPress={() => abrirEdicion(item)} style={styles.actionButton}>
+                    <LucideEdit size={18} color={Colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteAbonado(item.id)} style={styles.actionButton}>
+                    <LucideTrash2 size={18} color={Colors.danger} />
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 
     return (
@@ -115,6 +183,45 @@ export default function AbonadosScreen({ navigation }) {
                     )}
                 />
             )}
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Editar Abonado</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={nombreEditado}
+                            onChangeText={setNombreEditado}
+                            placeholder="Nombre del abonado"
+                            autoFocus
+                        />
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setModalVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.saveButton]}
+                                onPress={updateAbonado}
+                                disabled={guardandoEdicion}
+                            >
+                                {guardandoEdicion ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>Guardar</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -174,24 +281,96 @@ const styles = StyleSheet.create({
     list: {
         paddingBottom: 20,
     },
-    item: {
+    itemWrapper: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        padding: 16,
         borderRadius: 12,
         marginBottom: 8,
         alignItems: 'center',
-        justifyContent: 'space-between',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
         elevation: 1,
     },
+    itemMain: {
+        flex: 1,
+        flexDirection: 'row',
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    itemActions: {
+        flexDirection: 'row',
+        borderLeftWidth: 1,
+        borderLeftColor: Colors.border,
+        paddingHorizontal: 8,
+    },
+    actionButton: {
+        padding: 10,
+    },
     itemText: {
         fontSize: 16,
         color: Colors.text,
         fontWeight: '500',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        width: '100%',
+        borderRadius: 20,
+        padding: 24,
+        elevation: 10,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: Colors.text,
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    modalInput: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        height: 52,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        fontSize: 16,
+        color: Colors.text,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        marginTop: 20,
+        justifyContent: 'flex-end',
+    },
+    modalButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+        marginLeft: 12,
+        minWidth: 100,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#f1f5f9',
+    },
+    cancelButtonText: {
+        color: Colors.text,
+        fontWeight: '600',
+    },
+    saveButton: {
+        backgroundColor: Colors.primary,
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontWeight: '600',
     },
     emptyContainer: {
         padding: 40,

@@ -1,0 +1,8 @@
+.agent/
+.agents/
+node_modules/
+.expo/
+.next/
+dist/
+build/
+*.log

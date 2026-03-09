@@ -26,7 +26,7 @@ export default function SorteosScreen({ navigation }) {
         try {
             const { data, error } = await supabase
                 .from('sorteos')
-                .select('*, pagos(estado)')
+                .select('*, pagos(estado, metodo_pago)')
                 .order('fecha', { ascending: false });
 
             if (error) throw error;
@@ -90,7 +90,12 @@ export default function SorteosScreen({ navigation }) {
 
     const renderItem = ({ item }) => {
         const countDelivered = item.pagos?.filter(p => p.estado === 'delivered').length || 0;
-        const countPaid = item.pagos?.filter(p => p.estado === 'paid').length || 0;
+        const countEfectivo = item.pagos?.filter(p => p.estado === 'paid' && p.metodo_pago === 'efectivo').length || 0;
+        const countBizum = item.pagos?.filter(p => p.estado === 'paid' && p.metodo_pago === 'bizum').length || 0;
+        const countPaid = countEfectivo + countBizum;
+
+        const totalEfectivo = countEfectivo * item.precio;
+        const totalBizum = countBizum * item.precio;
         const totalCollected = countPaid * item.precio;
 
         return (
@@ -109,12 +114,16 @@ export default function SorteosScreen({ navigation }) {
                         <Text style={styles.cardStatValue}>{countDelivered}</Text>
                     </View>
                     <View style={styles.cardStat}>
-                        <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Pagados</Text>
-                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{countPaid}</Text>
+                        <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Efect. ({countEfectivo})</Text>
+                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalEfectivo}€</Text>
+                    </View>
+                    <View style={styles.cardStat}>
+                        <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Bizum ({countBizum})</Text>
+                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalBizum}€</Text>
                     </View>
                     <View style={styles.cardStat}>
                         <Text style={[styles.cardStatLabel, { color: Colors.success }]}>Total</Text>
-                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalCollected} €</Text>
+                        <Text style={[styles.cardStatValue, { color: Colors.success }]}>{totalCollected}€</Text>
                     </View>
                 </View>
 
@@ -296,7 +305,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     cardStatValue: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: 'bold',
         color: Colors.primary,
     },

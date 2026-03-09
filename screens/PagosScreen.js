@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
-import { LucideCheckCircle, LucideCircle, LucidePackage, LucideSave } from 'lucide-react-native';
+import { LucideCheckCircle, LucideCircle, LucidePackage, LucideSave, LucideSmartphone, LucideBanknote } from 'lucide-react-native';
 
 const ABC = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Ñ', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
@@ -78,7 +78,11 @@ export default function PagosScreen({ route }) {
 
             const mapaPagos = {};
             pays.forEach(p => {
-                mapaPagos[p.abonado_id] = p.estado;
+                mapaPagos[p.abonado_id] = {
+                    estado: p.estado,
+                    metodo_pago: p.metodo_pago || 'efectivo',
+                    fecha_pago: p.fecha_pago
+                };
             });
 
             setAbonados(subs);
@@ -91,7 +95,8 @@ export default function PagosScreen({ route }) {
     }
 
     function togglePago(abonadoId) {
-        const estadoActual = pagos[abonadoId] || 'pending';
+        const infoActual = pagos[abonadoId] || { estado: 'pending', metodo_pago: 'efectivo' };
+        const estadoActual = infoActual.estado;
 
         let nuevoEstado;
         if (estadoActual === 'pending') {
@@ -102,7 +107,40 @@ export default function PagosScreen({ route }) {
             nuevoEstado = 'pending';
         }
 
-        setPagos(prev => ({ ...prev, [abonadoId]: nuevoEstado }));
+        setPagos(prev => {
+            const infoActualAbonado = prev[abonadoId] || { estado: 'pending', metodo_pago: 'efectivo', fecha_pago: null };
+            let nuevaFecha = infoActualAbonado.fecha_pago;
+
+            if (nuevoEstado === 'paid' && !nuevaFecha) {
+                nuevaFecha = new Date().toISOString();
+            } else if (nuevoEstado !== 'paid') {
+                nuevaFecha = null;
+            }
+
+            return {
+                ...prev,
+                [abonadoId]: {
+                    estado: nuevoEstado,
+                    metodo_pago: infoActualAbonado.metodo_pago,
+                    fecha_pago: nuevaFecha
+                }
+            };
+        });
+        setIdsModificados(prev => {
+            const next = new Set(prev);
+            next.add(abonadoId);
+            return next;
+        });
+    }
+
+    function cambiarMetodoPago(abonadoId, metodo) {
+        setPagos(prev => ({
+            ...prev,
+            [abonadoId]: {
+                ...prev[abonadoId],
+                metodo_pago: metodo
+            }
+        }));
         setIdsModificados(prev => {
             const next = new Set(prev);
             next.add(abonadoId);
@@ -118,8 +156,9 @@ export default function PagosScreen({ route }) {
             const rowsToUpsert = Array.from(idsModificados).map(id => ({
                 abonado_id: id,
                 sorteo_id: sorteoSeleccionado.id,
-                estado: pagos[id],
-                fecha_pago: pagos[id] === 'paid' ? new Date().toISOString() : null
+                estado: pagos[id].estado,
+                metodo_pago: pagos[id].metodo_pago,
+                fecha_pago: pagos[id].fecha_pago
             }));
 
             const { error } = await supabase
@@ -158,7 +197,10 @@ export default function PagosScreen({ route }) {
     );
 
     const renderAbonadoItem = ({ item }) => {
-        const estado = pagos[item.id] || 'pending';
+        const info = pagos[item.id] || { estado: 'pending', metodo_pago: 'efectivo', fecha_pago: null };
+        const estado = info.estado;
+        const metodo = info.metodo_pago;
+        const fechaPago = info.fecha_pago;
         const modificado = idsModificados.has(item.id);
 
         let icon = <LucideCircle color={Colors.subtext} size={24} />;
@@ -179,31 +221,77 @@ export default function PagosScreen({ route }) {
         }
 
         return (
-            <TouchableOpacity
-                style={rowStyle}
-                onPress={() => togglePago(item.id)}
-            >
-                <View style={{ flex: 1 }}>
+            <View style={rowStyle}>
+                <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => togglePago(item.id)}
+                >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={nameStyle}>{item.nombre}</Text>
                         {modificado && <View style={styles.dotModificado} />}
                     </View>
-                    <Text style={[styles.statusLabel, estado === 'delivered' && { color: Colors.primary }, estado === 'paid' && { color: Colors.success }]}>
-                        {label}
-                    </Text>
-                </View>
-                {icon}
-            </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.statusLabel, estado === 'delivered' && { color: Colors.primary }, estado === 'paid' && { color: Colors.success }]}>
+                            {label}
+                        </Text>
+                        {estado === 'paid' && (
+                            <Text style={styles.metodoLabel}> • {metodo === 'bizum' ? 'Bizum' : 'Efectivo'}</Text>
+                        )}
+                        {estado === 'paid' && fechaPago && (
+                            <Text style={styles.fechaPagoLabel}> • {formatDateToUI(fechaPago)}</Text>
+                        )}
+                    </View>
+                </TouchableOpacity>
+
+                {estado === 'paid' && (
+                    <View style={styles.metodoSelector}>
+                        <TouchableOpacity
+                            onPress={() => cambiarMetodoPago(item.id, 'efectivo')}
+                            style={[styles.metodoIcon, metodo === 'efectivo' && styles.metodoIconActive]}
+                        >
+                            <LucideBanknote size={18} color={metodo === 'efectivo' ? '#fff' : Colors.subtext} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => cambiarMetodoPago(item.id, 'bizum')}
+                            style={[styles.metodoIcon, metodo === 'bizum' && styles.metodoIconActive]}
+                        >
+                            <LucideSmartphone size={18} color={metodo === 'bizum' ? '#fff' : Colors.subtext} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                <TouchableOpacity onPress={() => togglePago(item.id)}>
+                    {icon}
+                </TouchableOpacity>
+            </View>
         );
     };
 
-    const abonadosFiltrados = useMemo(() => {
-        if (!filtroLetra) return abonados;
-        return abonados.filter(a => a.nombre.toUpperCase().startsWith(filtroLetra));
-    }, [abonados, filtroLetra]);
+    const listasOrganizadas = useMemo(() => {
+        let filtrados = abonados;
+        if (filtroLetra) {
+            filtrados = abonados.filter(a => a.nombre.toUpperCase().startsWith(filtroLetra));
+        }
 
-    const countDelivered = Object.values(pagos).filter(s => s === 'delivered').length;
-    const countPaid = Object.values(pagos).filter(s => s === 'paid').length;
+        const pendientes = filtrados.filter(a => (pagos[a.id]?.estado || 'pending') !== 'paid');
+        const pagados = filtrados.filter(a => pagos[a.id]?.estado === 'paid');
+
+        // Ordenar pagados por fecha (más reciente primero)
+        pagados.sort((a, b) => {
+            const fechaA = pagos[a.id]?.fecha_pago || '';
+            const fechaB = pagos[b.id]?.fecha_pago || '';
+            return fechaB.localeCompare(fechaA);
+        });
+
+        return { pendientes, pagados };
+    }, [abonados, (filtroLetra), pagos]);
+
+    const countDelivered = Object.values(pagos).filter(s => s.estado === 'delivered').length;
+    const countPaid = Object.values(pagos).filter(s => s.estado === 'paid').length;
+    const countBizum = Object.values(pagos).filter(s => s.estado === 'paid' && s.metodo_pago === 'bizum').length;
+    const countEfectivo = Object.values(pagos).filter(s => s.estado === 'paid' && s.metodo_pago === 'efectivo').length;
+    const totalEfectivo = countEfectivo * (sorteoSeleccionado?.precio || 0);
+    const totalBizum = countBizum * (sorteoSeleccionado?.precio || 0);
     const totalCollected = countPaid * (sorteoSeleccionado?.precio || 0);
 
     return (
@@ -229,13 +317,24 @@ export default function PagosScreen({ route }) {
                     <View style={[styles.statBox, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#cad5e2' }]}>
                         <Text style={[styles.statLabel, { color: Colors.success }]}>Pagados</Text>
                         <Text style={[styles.statValue, { color: Colors.success }]}>{countPaid}</Text>
-                        <Text style={styles.statSub}>cobrados</Text>
+                        <Text style={styles.statSub}>({countEfectivo}💵 / {countBizum}📱)</Text>
                     </View>
                     <View style={styles.statBox}>
-                        <Text style={[styles.statLabel, { color: Colors.success }]}>Total</Text>
-                        <Text style={[styles.statValue, { color: Colors.success }]}>{totalCollected}€</Text>
-                        <Text style={styles.statSub}>en caja</Text>
+                        <Text style={[styles.statLabel, { color: Colors.success }]}>Total Efect.</Text>
+                        <Text style={[styles.statValue, { color: Colors.success, fontSize: 18 }]}>{totalEfectivo}€</Text>
+                        <Text style={styles.statSub}>en metálico</Text>
                     </View>
+                    <View style={[styles.statBox, { borderLeftWidth: 1, borderColor: '#cad5e2' }]}>
+                        <Text style={[styles.statLabel, { color: Colors.success }]}>Total Bizum</Text>
+                        <Text style={[styles.statValue, { color: Colors.success, fontSize: 18 }]}>{totalBizum}€</Text>
+                        <Text style={styles.statSub}>por móvil</Text>
+                    </View>
+                </View>
+            )}
+
+            {sorteoSeleccionado && (
+                <View style={styles.totalGlobalBar}>
+                    <Text style={styles.totalGlobalText}>RECAUDACIÓN TOTAL: {totalCollected}€</Text>
                 </View>
             )}
 
@@ -262,17 +361,35 @@ export default function PagosScreen({ route }) {
             {loading && abonados.length === 0 ? (
                 <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
             ) : (
-                <FlatList
-                    data={abonadosFiltrados}
-                    renderItem={renderAbonadoItem}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.subscriberList}
-                    ListEmptyComponent={() => (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>No hay abonados con la letra "{filtroLetra}"</Text>
+                <ScrollView contentContainerStyle={styles.subscriberList}>
+                    {listasOrganizadas.pendientes.length > 0 && (
+                        <View style={{ marginBottom: 20 }}>
+                            <Text style={styles.sectionTitle}>Pendientes ({listasOrganizadas.pendientes.length})</Text>
+                            {listasOrganizadas.pendientes.map(item => (
+                                <View key={item.id}>
+                                    {renderAbonadoItem({ item })}
+                                </View>
+                            ))}
                         </View>
                     )}
-                />
+
+                    {listasOrganizadas.pagados.length > 0 && (
+                        <View>
+                            <Text style={[styles.sectionTitle, { color: Colors.success }]}>Pagados ({listasOrganizadas.pagados.length})</Text>
+                            {listasOrganizadas.pagados.map(item => (
+                                <View key={item.id}>
+                                    {renderAbonadoItem({ item })}
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {listasOrganizadas.pendientes.length === 0 && listasOrganizadas.pagados.length === 0 && (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>No hay resultados con el filtro aplicado</Text>
+                        </View>
+                    )}
+                </ScrollView>
             )}
 
             {idsModificados.size > 0 && (
@@ -351,13 +468,24 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     statValue: {
-        fontSize: 22,
+        fontSize: 18, // Reducido un poco para que quepan 4 columnas
         fontWeight: '800',
         color: Colors.primary,
     },
     statSub: {
-        fontSize: 10,
+        fontSize: 9,
         color: Colors.subtext,
+    },
+    totalGlobalBar: {
+        backgroundColor: Colors.primary,
+        paddingVertical: 4,
+        alignItems: 'center',
+    },
+    totalGlobalText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: 'bold',
+        letterSpacing: 1,
     },
     abcContainer: {
         backgroundColor: '#fff',
@@ -438,6 +566,43 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: Colors.subtext,
         marginTop: 2,
+    },
+    metodoLabel: {
+        fontSize: 12,
+        color: Colors.subtext,
+        marginTop: 2,
+        fontStyle: 'italic',
+    },
+    fechaPagoLabel: {
+        fontSize: 12,
+        color: Colors.subtext,
+        marginTop: 2,
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: Colors.primary,
+        marginBottom: 10,
+        marginLeft: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    metodoSelector: {
+        flexDirection: 'row',
+        backgroundColor: '#f1f5f9',
+        borderRadius: 20,
+        padding: 4,
+        marginRight: 10,
+    },
+    metodoIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    metodoIconActive: {
+        backgroundColor: Colors.primary,
     },
     emptyContainer: {
         padding: 40,

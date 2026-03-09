@@ -31,8 +31,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "62c632c3-e330-4fdd-8217-e800d554f81c"
+        "projectId": "df5a2eed-30f0-4da9-bb08-e087ffc96f9f"
       }
-    }
+    },
+    "owner": "tonicolomina"
   }
 }
